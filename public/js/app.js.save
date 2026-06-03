@@ -1,0 +1,832 @@
+// Frontend Application State
+const state = {
+  activeTab: 'dashboard',
+  stats: {},
+  settings: {},
+  cv: null,
+  jobs: [],
+  selectedJobId: null,
+  logs: [],
+  logsPollInterval: null,
+  statsPollInterval: null,
+  scoreFilter: 'all',
+  searchQuery: ''
+};
+
+// DOM Elements Cache
+const elements = {};
+
+// Initialize Application
+document.addEventListener('DOMContentLoaded', () => {
+  cacheElements();
+  registerEvents();
+  
+  // Load initial dataset
+  loadSettings();
+  loadStats();
+  loadLogs();
+  loadJobs();
+  loadCV();
+
+  // Set up polling (every 4 seconds for logs and stats to feel real-time)
+  state.logsPollInterval = setInterval(loadLogs, 4000);
+  state.statsPollInterval = setInterval(loadStats, 6000);
+});
+
+// Cache elements to improve performance
+function cacheElements() {
+  elements.navLinks = document.querySelectorAll('.nav-link');
+  elements.tabSections = document.querySelectorAll('.tab-content');
+  elements.pageTitle = document.getElementById('pageTitle');
+  elements.pageSubtitle = document.getElementById('pageSubtitle');
+  
+  // Dashboard elements
+  elements.statJobsFound = document.getElementById('statJobsFound');
+  elements.statJobsAnalyzed = document.getElementById('statJobsAnalyzed');
+  elements.statAvgScore = document.getElementById('statAvgScore');
+  elements.statCronSchedule = document.getElementById('statCronSchedule');
+  elements.cvStatusContent = document.getElementById('cvStatusContent');
+  elements.terminalLogs = document.getElementById('terminalLogs');
+  elements.clearLogsBtn = document.getElementById('clearLogsBtn');
+  elements.runSearchBtn = document.getElementById('runSearchBtn');
+  elements.demoModeBadge = document.getElementById('demoModeBadge');
+  
+  // Settings Summary
+  elements.sumKeywords = document.getElementById('sumKeywords');
+  elements.sumLocations = document.getElementById('sumLocations');
+  elements.sumCron = document.getElementById('sumCron');
+  
+  // CV upload elements
+  elements.dropZone = document.getElementById('dropZone');
+  elements.cvFileInput = document.getElementById('cvFileInput');
+  elements.browseFileBtn = document.getElementById('browseFileBtn');
+  elements.uploadProgressCard = document.getElementById('uploadProgressCard');
+  elements.uploadProgressContainer = document.getElementById('uploadProgressContainer');
+  elements.progressBar = document.getElementById('progressBar');
+  elements.progressStatus = document.getElementById('progressStatus');
+  elements.profilePreviewContent = document.getElementById('profilePreviewContent');
+  
+  // Jobs List elements
+  elements.jobsListContainer = document.getElementById('jobsListContainer');
+  elements.jobDetailPane = document.getElementById('jobDetailPane');
+  elements.jobSearchInput = document.getElementById('jobSearchInput');
+  elements.scoreFilterButtons = document.querySelectorAll('.score-filters .btn-chip');
+  
+  // Settings tab elements
+  elements.settingsForm = document.getElementById('settingsForm');
+  elements.keywordsInput = document.getElementById('keywordsInput');
+  elements.locationsInput = document.getElementById('locationsInput');
+  elements.cronInput = document.getElementById('cronInput');
+  elements.mockModeCheckbox = document.getElementById('mockModeCheckbox');
+}
+
+// Register UI event handlers
+function registerEvents() {
+  // Tab Switching Navigation
+  elements.navLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetTab = link.getAttribute('data-tab');
+      switchTab(targetTab);
+    });
+  });
+
+  // Manual search trigger
+  elements.runSearchBtn.addEventListener('click', triggerManualSearch);
+
+  // Clear log console
+  elements.clearLogsBtn.addEventListener('click', clearLogs);
+
+  // CV Upload Drag & Drop triggers
+  elements.browseFileBtn.addEventListener('click', () => elements.cvFileInput.click());
+  elements.cvFileInput.addEventListener('change', handleFileSelect);
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    elements.dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      elements.dropZone.classList.add('dragover');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    elements.dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      elements.dropZone.classList.remove('dragover');
+    }, false);
+  });
+
+  elements.dropZone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files.length > 0) {
+      uploadCVFile(files[0]);
+    }
+  });
+
+  // Settings Save
+  elements.settingsForm.addEventListener('submit', saveSettings);
+
+  // Job Search / Filter inputs
+  elements.jobSearchInput.addEventListener('input', (e) => {
+    state.searchQuery = e.target.value.toLowerCase();
+    renderJobsList();
+  });
+
+  elements.scoreFilterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      elements.scoreFilterButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.scoreFilter = btn.getAttribute('data-score');
+      renderJobsList();
+    });
+  });
+}
+
+// Switch between SPA tabs
+function switchTab(tabId) {
+  state.activeTab = tabId;
+  window.location.hash = tabId;
+
+  // Update navbar links
+  elements.navLinks.forEach(link => {
+    if (link.getAttribute('data-tab') === tabId) {
+      link.classList.add('active');
+    } else {
+      link.classList.remove('active');
+    }
+  });
+
+  // Show selected section
+  elements.tabSections.forEach(section => {
+    if (section.id === `${tabId}Tab`) {
+      section.classList.add('active');
+    } else {
+      section.classList.remove('active');
+    }
+  });
+
+  // Update header text dynamically
+  const titles = {
+    dashboard: { title: 'Dashboard Overview', sub: 'Real-time status of your Job Hunter AI Agent' },
+    'cv-manager': { title: 'CV & Profile Manager', sub: 'Upload resumes and review parsed highlights' },
+    jobs: { title: 'Job Boards Explorer', sub: 'Review compatible match scores and generated materials' },
+    settings: { title: 'Agent Configuration', sub: 'Control search queries, crawl ranges, and cron patterns' }
+  };
+
+  if (titles[tabId]) {
+    elements.pageTitle.textContent = titles[tabId].title;
+    elements.pageSubtitle.textContent = titles[tabId].sub;
+  }
+}
+
+// Switch tab and trigger CV file picker
+function triggerCVUpload() {
+  let input = document.getElementById('cvFileInput');
+
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'cvFileInput';
+    input.accept = '.pdf,.doc,.docx';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', handleCVUpload);
+  }
+
+  input.click();
+}
+window.triggerCVUpload = triggerCVUpload;
+  switchTab('cv-manager');
+  setTimeout(() => {
+    if (elements.cvFileInput) {
+      elements.cvFileInput.click();
+    }
+  }, 150);
+}
+window.triggerCVUpload = triggerCVUpload;
+
+// Global Tab Switching Helper
+window.switchTab = switchTab;
+
+// API Communication Wrappers
+
+async function fetchAPI(endpoint, options = {}) {
+  try {
+    const response = await fetch(endpoint, options);
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || `HTTP error ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`API Call failed (${endpoint}):`, error);
+    throw error;
+  }
+}
+
+// Load configurations
+async function loadSettings() {
+  try {
+    const settings = await fetchAPI('/api/settings');
+    state.settings = settings;
+
+    // Populate Settings Form
+    elements.keywordsInput.value = settings.keywords || '';
+    elements.locationsInput.value = settings.locations || '';
+    elements.cronInput.value = settings.cronSchedule || '';
+    elements.mockModeCheckbox.checked = !!settings.mockScraping;
+
+    // Populate Summaries
+    elements.sumKeywords.textContent = settings.keywords;
+    elements.sumLocations.textContent = settings.locations;
+    elements.sumCron.textContent = formatCronPattern(settings.cronSchedule);
+  } catch (err) {
+    appendSystemLog(`Error loading settings: ${err.message}`, 'error');
+  }
+}
+
+// Save Configuration
+async function saveSettings(e) {
+  e.preventDefault();
+  
+  const payload = {
+    keywords: elements.keywordsInput.value,
+    locations: elements.locationsInput.value,
+    cronSchedule: elements.cronInput.value,
+    mockScraping: elements.mockModeCheckbox.checked
+  };
+
+  try {
+    const saveBtn = elements.settingsForm.querySelector('button[type="submit"]');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving Settings...';
+
+    const result = await fetchAPI('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    state.settings = result.settings;
+    appendSystemLog('Configuration updated successfully.', 'success');
+    
+    // Refresh GUI states
+    await loadSettings();
+    await loadStats();
+    
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Configuration';
+    
+    // Jump to dashboard to see results
+    switchTab('dashboard');
+  } catch (err) {
+    appendSystemLog(`Failed to save settings: ${err.message}`, 'error');
+    const saveBtn = elements.settingsForm.querySelector('button[type="submit"]');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Configuration';
+  }
+}
+
+// Fetch stats and refresh indicators
+async function loadStats() {
+  try {
+    const stats = await fetchAPI('/api/stats');
+    state.stats = stats;
+
+    elements.statJobsFound.textContent = stats.jobsFound;
+    elements.statJobsAnalyzed.textContent = stats.jobsAnalyzed;
+    elements.statAvgScore.textContent = stats.averageScore.toFixed(1);
+    elements.statCronSchedule.textContent = formatCronPattern(stats.cronSchedule);
+
+    // Toggle Demo/API banner
+    if (stats.isDemoMode) {
+      elements.demoModeBadge.classList.remove('hidden');
+      elements.demoModeBadge.innerHTML = '<i class="fa-solid fa-vial"></i> Demo Mode (No Key)';
+      elements.demoModeBadge.style.color = '#e11d48';
+      elements.demoModeBadge.style.borderColor = 'rgba(225, 29, 72, 0.3)';
+    } else {
+      elements.demoModeBadge.classList.add('hidden');
+    }
+
+    // Toggle button searching state
+    if (stats.manualSearchInProgress) {
+      elements.runSearchBtn.disabled = true;
+      elements.runSearchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agent Crawling...';
+      elements.runSearchBtn.classList.add('loading-pulse');
+    } else {
+      elements.runSearchBtn.disabled = false;
+      elements.runSearchBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart"></i> Run Agent Search';
+      elements.runSearchBtn.classList.remove('loading-pulse');
+    }
+  } catch (err) {
+    console.error('Stats fetching failed:', err);
+  }
+}
+
+// Poll & render console logs
+async function loadLogs() {
+  try {
+    const logs = await fetchAPI('/api/logs');
+    
+    // Only repaint if length changed or we had empty logs
+    if (logs.length !== state.logs.length) {
+      state.logs = logs;
+      renderLogsConsole();
+    }
+  } catch (err) {
+    console.error('Logs fetching failed:', err);
+  }
+}
+
+function renderLogsConsole() {
+  elements.terminalLogs.innerHTML = '';
+  
+  if (state.logs.length === 0) {
+    elements.terminalLogs.innerHTML = '<div class="log-line system-line">[System] Console clean. No execution logs yet.</div>';
+    return;
+  }
+
+  state.logs.forEach(log => {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    
+    // Style lines based on contents
+    const text = log.message;
+    if (text.includes('failed') || text.includes('error') || text.includes('Error') || text.includes('Unauthorized')) {
+      line.classList.add('error');
+    } else if (text.includes('completed') || text.includes('finished') || text.includes('successfully') || text.includes('uploaded')) {
+      line.classList.add('success');
+    } else if (text.includes('Gemini') || text.includes('Matching') || text.includes('agent')) {
+      line.classList.add('agent');
+    } else {
+      line.classList.add('system-line');
+    }
+
+    const timeString = new Date(log.timestamp).toLocaleTimeString();
+    line.innerHTML = `<span class="timestamp">[${timeString}]</span>${escapeHTML(text)}`;
+    elements.terminalLogs.appendChild(line);
+  });
+
+  // Auto-scroll to bottom of console
+  elements.terminalLogs.scrollTop = elements.terminalLogs.scrollHeight;
+}
+
+// Clear log panel
+async function clearLogs() {
+  try {
+    await fetchAPI('/api/logs', { method: 'DELETE' });
+    state.logs = [];
+    renderLogsConsole();
+    appendSystemLog('Console logs cleared.', 'system');
+  } catch (err) {
+    appendSystemLog(`Clear logs endpoint failed: ${err.message}`, 'error');
+  }
+}
+
+// Trigger background hunt
+async function triggerManualSearch() {
+  try {
+    appendSystemLog('Manual agent search request sent to backend...', 'system');
+    elements.runSearchBtn.disabled = true;
+    elements.runSearchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing...';
+
+    const result = await fetchAPI('/api/search/run', { method: 'POST' });
+    if (result.success) {
+      appendSystemLog('Job Search initiated. Scraping and comparisons running in background.', 'success');
+      loadStats();
+      loadLogs();
+      
+      // Auto-load jobs list after a delay
+      setTimeout(() => {
+        loadJobs();
+      }, 10000); // 10s initial delay, and then the user can inspect as it completes
+    }
+  } catch (err) {
+    appendSystemLog(`Crawl trigger failed: ${err.message}`, 'error');
+    loadStats();
+  }
+}
+
+// Handle CV uploads
+function handleFileSelect(e) {
+  const files = e.target.files;
+  if (files.length > 0) {
+    uploadCVFile(files[0]);
+  }
+}
+
+async function uploadCVFile(file) {
+  const allowedExtensions = ['pdf', 'docx'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  
+  if (!allowedExtensions.includes(ext)) {
+    alert('Invalid file format. Please upload a PDF or DOCX Word document.');
+    return;
+  }
+
+  // Switch UI to loading mode
+  elements.dropZone.classList.add('hidden');
+  elements.uploadProgressContainer.classList.remove('hidden');
+  elements.progressBar.style.width = '20%';
+  elements.progressStatus.textContent = 'Uploading resume document...';
+
+  const formData = new FormData();
+  formData.append('cv', file);
+
+  try {
+    // Fake progress interval for UX since fetch upload is fast but AI takes 3-6s
+    let width = 20;
+    const progressTimer = setInterval(() => {
+      if (width < 90) {
+        width += Math.floor(Math.random() * 10) + 2;
+        elements.progressBar.style.width = `${width}%`;
+        if (width > 50) elements.progressStatus.textContent = 'AI parsing and parsing details...';
+        if (width > 75) elements.progressStatus.textContent = 'Structuring skills and cataloging matches...';
+      }
+    }, 450);
+
+    const response = await fetch('/api/cv/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    clearInterval(progressTimer);
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Server upload failure');
+    }
+
+    const data = await response.json();
+    elements.progressBar.style.width = '100%';
+    elements.progressStatus.textContent = 'Parsing complete!';
+    
+    appendSystemLog(`CV "${file.name}" uploaded and parsed successfully.`, 'success');
+    
+    setTimeout(() => {
+      elements.uploadProgressContainer.classList.add('hidden');
+      elements.dropZone.classList.remove('hidden');
+      loadCV();
+      loadStats();
+      loadJobs(); // Reload jobs to enable matches if CV was missing
+    }, 1000);
+
+  } catch (err) {
+    console.error('File upload error:', err);
+    alert(`File upload failed: ${err.message}`);
+    elements.uploadProgressContainer.classList.add('hidden');
+    elements.dropZone.classList.remove('hidden');
+  }
+}
+
+// Load CV profile preview
+async function loadCV() {
+  try {
+    const cv = await fetchAPI('/api/cv');
+    state.cv = cv;
+    renderCVPreview();
+  } catch (err) {
+    console.error('CV loading failed:', err);
+  }
+}
+
+function renderCVPreview() {
+  // Update dashboard preview widget
+  if (!state.cv || !state.cv.text) {
+    elements.cvStatusContent.innerHTML = `
+      <div class="cv-missing-state">
+        <i class="fa-solid fa-file-circle-question"></i>
+        <p>No CV uploaded yet. Please upload your CV to enable AI compatibility analysis.</p>
+        <button class="btn btn-secondary btn-sm" onclick="triggerCVUpload()">Upload CV Now</button>
+      </div>
+    `;
+    elements.profilePreviewContent.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-user-slash"></i>
+        <p>Upload your CV to preview how the AI extracts your details, skills, and highlights.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Dashboard CV Status Card
+  const profile = state.cv.parsedData || {};
+  elements.cvStatusContent.innerHTML = `
+    <div class="cv-active-state">
+      <i class="fa-solid fa-file-pdf"></i>
+      <div class="cv-meta">
+        <h4>${escapeHTML(state.cv.filename)}</h4>
+        <p>Last Analyzed: ${new Date(state.cv.lastUpdated).toLocaleString()}</p>
+        ${profile.name ? `<p><strong>Candidate:</strong> ${escapeHTML(profile.name)}</p>` : ''}
+      </div>
+    </div>
+    ${profile.summary ? `<div class="cv-summary-preview">${escapeHTML(profile.summary.substring(0, 160))}...</div>` : ''}
+  `;
+
+  // CV Manager Tab Preview
+  elements.profilePreviewContent.innerHTML = `
+    <div class="profile-preview-body">
+      <h2>${escapeHTML(profile.name || 'Shawmiya Christen')}</h2>
+      <div class="profile-meta-info">
+        ${profile.email ? `<span><i class="fa-solid fa-envelope"></i> ${escapeHTML(profile.email)}</span>` : ''}
+        ${profile.phone ? `<span><i class="fa-solid fa-phone"></i> ${escapeHTML(profile.phone)}</span>` : ''}
+        ${profile.location ? `<span><i class="fa-solid fa-location-dot"></i> ${escapeHTML(profile.location)}</span>` : ''}
+      </div>
+      
+      ${profile.summary ? `
+        <div class="profile-section">
+          <h4>Professional Summary</h4>
+          <p>${escapeHTML(profile.summary)}</p>
+        </div>
+      ` : ''}
+
+      <div class="profile-section">
+        <h4>Skills Categorization (AI Structured)</h4>
+        <div class="skills-preview-group">
+          ${profile.skills && profile.skills.technical && profile.skills.technical.length > 0 ? `
+            <div class="skill-category">
+              <h5>Technical & Hard Skills</h5>
+              <div class="tag-container">
+                ${profile.skills.technical.map(t => `<span class="tag tag-tech">${escapeHTML(t)}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          ${profile.skills && profile.skills.soft && profile.skills.soft.length > 0 ? `
+            <div class="skill-category">
+              <h5>Soft Skills & Methodologies</h5>
+              <div class="tag-container">
+                ${profile.skills.soft.map(s => `<span class="tag tag-soft">${escapeHTML(s)}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${profile.skills && profile.skills.tools && profile.skills.tools.length > 0 ? `
+            <div class="skill-category">
+              <h5>Tools, SDKs & Libraries</h5>
+              <div class="tag-container">
+                ${profile.skills.tools.map(w => `<span class="tag tag-tool">${escapeHTML(w)}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Fetch and render jobs board
+async function loadJobs() {
+  try {
+    const jobs = await fetchAPI('/api/jobs');
+    state.jobs = jobs;
+    renderJobsList();
+  } catch (err) {
+    console.error('Failed to load jobs list:', err);
+  }
+}
+
+function renderJobsList() {
+  elements.jobsListContainer.innerHTML = '';
+  
+  // Filter jobs by score category and search input
+  const filteredJobs = state.jobs.filter(job => {
+    // Text search filter
+    const matchesSearch = job.title.toLowerCase().includes(state.searchQuery) ||
+                          job.company.toLowerCase().includes(state.searchQuery) ||
+                          (job.description && job.description.toLowerCase().includes(state.searchQuery));
+    
+    if (!matchesSearch) return false;
+
+    // Score categorization filters
+    const score = job.match ? job.match.score : null;
+    if (state.scoreFilter === 'all') return true;
+    if (state.scoreFilter === 'high') return score !== null && score >= 8;
+    if (state.scoreFilter === 'medium') return score !== null && score >= 5 && score <= 7;
+    if (state.scoreFilter === 'low') return score !== null && score < 5;
+    
+    return true;
+  });
+
+  if (filteredJobs.length === 0) {
+    elements.jobsListContainer.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-folder-open"></i>
+        <p>No job listings match your current filters.</p>
+      </div>
+    `;
+    return;
+  }
+
+  filteredJobs.forEach(job => {
+    const item = document.createElement('div');
+    item.className = `job-item ${state.selectedJobId === job.id ? 'selected' : ''}`;
+    item.setAttribute('data-id', job.id);
+    
+    const score = job.match ? job.match.score : null;
+    let scoreClass = 'score-none';
+    let scoreText = 'N/A';
+    
+    if (score !== null) {
+      scoreText = `${score}/10`;
+      if (score >= 8) scoreClass = 'score-high';
+      else if (score >= 5) scoreClass = 'score-med';
+      else scoreClass = 'score-low';
+    }
+
+    item.innerHTML = `
+      <div class="job-item-info">
+        <h4>${escapeHTML(job.title)}</h4>
+        <p>${escapeHTML(job.company)}</p>
+        <div class="job-item-meta">
+          <span class="badge-platform">${escapeHTML(job.source)}</span>
+          <span class="form-help">${new Date(job.crawledAt).toLocaleDateString()}</span>
+        </div>
+      </div>
+      <div class="job-score-circle ${scoreClass}">
+        ${scoreText}
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      state.selectedJobId = job.id;
+      // Re-render list to show selected class
+      document.querySelectorAll('.job-item').forEach(el => el.classList.remove('selected'));
+      item.classList.add('selected');
+      renderJobDetails(job);
+    });
+
+    elements.jobsListContainer.appendChild(item);
+  });
+
+  // Preserve details selection on list update if item still exists
+  if (state.selectedJobId) {
+    const selectedJob = state.jobs.find(j => j.id === state.selectedJobId);
+    if (selectedJob) {
+      renderJobDetails(selectedJob);
+    }
+  }
+}
+
+function renderJobDetails(job) {
+  elements.jobDetailPane.innerHTML = '';
+
+  const match = job.match;
+  if (!match) {
+    // Job crawled but CV not matched yet or CV was uploaded post crawl
+    elements.jobDetailPane.innerHTML = `
+      <div class="glass-card job-detail-card">
+        <div class="job-detail-header">
+          <div class="detail-title">
+            <h3>${escapeHTML(job.title)}</h3>
+            <h4>${escapeHTML(job.company)}</h4>
+          </div>
+          <div class="detail-score-box">
+            <div class="score-large-ring score-none">N/A</div>
+            <span class="detail-score-label">Unmatched</span>
+          </div>
+        </div>
+        
+        <div class="job-description-box">
+          <h5>Job Description</h5>
+          <p>${escapeHTML(job.description || 'No description provided.')}</p>
+        </div>
+
+        <div class="empty-state">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <p>This job listing has not been compared with your resume. Make sure you have uploaded your CV and run a search cycle.</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let scoreClass = 'low';
+  if (match.score >= 8) scoreClass = 'high';
+  else if (match.score >= 5) scoreClass = 'med';
+
+  elements.jobDetailPane.innerHTML = `
+    <div class="glass-card job-detail-card">
+      <div class="job-detail-header">
+        <div class="detail-title">
+          <h3>${escapeHTML(job.title)}</h3>
+          <h4>${escapeHTML(job.company)}</h4>
+          <p class="form-help" style="margin-top: 6px;">
+            <i class="fa-solid fa-link"></i> <a href="${job.url}" target="_blank" style="color: var(--accent-cyan); text-decoration: none;">View Original Listing on ${job.source}</a>
+          </p>
+        </div>
+        <div class="detail-score-box">
+          <div class="score-large-ring ${scoreClass}">${match.score}/10</div>
+          <span class="detail-score-label">Compatibility</span>
+        </div>
+      </div>
+      
+      <div class="job-description-box">
+        <h5>Job Description Preview</h5>
+        <p>${escapeHTML(job.description || 'No description.')}</p>
+      </div>
+
+      <div class="skills-comparison-grid">
+        <div class="skill-list-box">
+          <h5 class="text-emerald"><i class="fa-solid fa-circle-check"></i> Matching Skills</h5>
+          <div class="skill-list">
+            ${match.matchingSkills && match.matchingSkills.length > 0 
+              ? match.matchingSkills.map(sk => `<span class="skill-item-badge badge-match">${escapeHTML(sk)}</span>`).join('')
+              : '<span class="form-help">No matching skills highlighted.</span>'
+            }
+          </div>
+        </div>
+        
+        <div class="skill-list-box">
+          <h5 class="text-rose"><i class="fa-solid fa-circle-xmark"></i> Missing Skills</h5>
+          <div class="skill-list">
+            ${match.missingSkills && match.missingSkills.length > 0 
+              ? match.missingSkills.map(sk => `<span class="skill-item-badge badge-missing">${escapeHTML(sk)}</span>`).join('')
+              : '<span class="form-help">Perfect skill coverage!</span>'
+            }
+          </div>
+        </div>
+      </div>
+
+      ${match.cvImprovements && match.cvImprovements.length > 0 ? `
+        <div class="improvements-box">
+          <h5><i class="fa-solid fa-wand-magic-sparkles"></i> Custom CV Improvement Suggestions</h5>
+          <ul class="improvements-list">
+            ${match.cvImprovements.map(imp => `<li>${escapeHTML(imp)}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+
+      <div class="cover-letter-box">
+        <div class="letter-actions">
+          <h5><i class="fa-solid fa-envelope-open-text"></i> Personalized Cover Letter Draft</h5>
+          <button class="btn btn-secondary btn-sm" onclick="copyCoverLetterToClipboard(this)">
+            <i class="fa-solid fa-copy"></i> Copy to Clipboard
+          </button>
+        </div>
+        <div class="letter-content-area" id="coverLetterText">${escapeHTML(match.coverLetter)}</div>
+      </div>
+    </div>
+  `;
+}
+
+// Copy to Clipboard feature for Cover Letters
+function copyCoverLetterToClipboard(btnElement) {
+  const content = document.getElementById('coverLetterText');
+  if (!content) return;
+  
+  navigator.clipboard.writeText(content.textContent)
+    .then(() => {
+      const originalText = btnElement.innerHTML;
+      btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+      btnElement.style.color = '#34d399';
+      btnElement.style.borderColor = '#10b981';
+      
+      setTimeout(() => {
+        btnElement.innerHTML = originalText;
+        btnElement.style.color = '';
+        btnElement.style.borderColor = '';
+      }, 2000);
+    })
+    .catch(err => {
+      alert('Failed to copy text: ' + err.message);
+    });
+}
+window.copyCoverLetterToClipboard = copyCoverLetterToClipboard;
+
+// Log writer console utility
+function appendSystemLog(message, type = 'system') {
+  const logsConsole = elements.terminalLogs;
+  if (!logsConsole) return;
+
+  const line = document.createElement('div');
+  line.className = `log-line ${type === 'error' ? 'error' : (type === 'success' ? 'success' : 'system-line')}`;
+  
+  const time = new Date().toLocaleTimeString();
+  line.innerHTML = `<span class="timestamp">[${time}]</span>[Local UI] ${escapeHTML(message)}`;
+  logsConsole.appendChild(line);
+  logsConsole.scrollTop = logsConsole.scrollHeight;
+}
+
+// Human readable cron formatting helper
+function formatCronPattern(cronStr) {
+  if (!cronStr) return '-';
+  if (cronStr === '0 */6 * * *') return '4x / Day (Every 6h)';
+  if (cronStr.startsWith('0 6,12,18,0') || cronStr.startsWith('0 0,6,12,18')) return '4x / Day (Vercel UTC)';
+  return cronStr;
+}
+
+// XSS Sanitizer
+function escapeHTML(str) {
+  if (!str) return '';
+  return str.replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}

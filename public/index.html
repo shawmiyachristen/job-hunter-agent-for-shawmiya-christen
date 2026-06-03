@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Hunter Agent for Shawmiya Christen</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <!-- Ambient background glowing blobs -->
+  <div class="glow-bg">
+    <div class="blob blob-purple"></div>
+    <div class="blob blob-cyan"></div>
+    <div class="blob blob-blue"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="glass-sidebar">
+      <div class="brand">
+        <div class="brand-logo">
+          <i class="fa-solid fa-radar-station pulse-icon"></i>
+        </div>
+        <div class="brand-name">
+          <h1>Job Hunter</h1>
+          <span>Agent v1.0</span>
+        </div>
+      </div>
+      
+      <div class="user-badge">
+        <div class="avatar">SC</div>
+        <div class="user-info">
+          <h3>Shawmiya Christen</h3>
+          <span class="badge badge-online">Agent Online</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <a href="#dashboard" class="nav-link active" data-tab="dashboard">
+          <i class="fa-solid fa-chart-line"></i> Dashboard
+        </a>
+        <a href="#cv-manager" class="nav-link" data-tab="cv-manager">
+          <i class="fa-solid fa-file-invoice"></i> CV & Profile
+        </a>
+        <a href="#jobs" class="nav-link" data-tab="jobs">
+          <i class="fa-solid fa-briefcase"></i> Job Board
+        </a>
+        <a href="#settings" class="nav-link" data-tab="settings">
+          <i class="fa-solid fa-sliders"></i> Settings
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="mode-indicator" id="demoModeBadge">
+          <i class="fa-solid fa-vial"></i> Demo Mode Active
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top header bar -->
+      <header class="glass-header">
+        <div class="header-title">
+          <h2 id="pageTitle">Dashboard Overview</h2>
+          <p id="pageSubtitle">Real-time status of your Job Hunter AI Agent</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-primary" id="runSearchBtn">
+            <i class="fa-solid fa-magnifying-glass-chart"></i> Run Agent Search
+          </button>
+        </div>
+      </header>
+
+      <!-- Tab Content: Dashboard -->
+      <section id="dashboardTab" class="tab-content active">
+        <!-- KPI Cards Grid -->
+        <div class="stats-grid">
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-cyan">
+              <i class="fa-solid fa-database"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Jobs Crawled</span>
+              <h3 class="stat-value" id="statJobsFound">0</h3>
+            </div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-purple">
+              <i class="fa-solid fa-brain"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">AI Matched</span>
+              <h3 class="stat-value" id="statJobsAnalyzed">0</h3>
+            </div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-emerald">
+              <i class="fa-solid fa-star"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Avg. Match Score</span>
+              <h3 class="stat-value" id="statAvgScore">0.0</h3>
+            </div>
+          </div>
+          <div class="stat-card glass-card">
+            <div class="stat-icon icon-rose">
+              <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">Scheduler Status</span>
+              <h3 class="stat-value" id="statCronSchedule">4x / Day</h3>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-body">
+          <!-- Left: Quick CV upload / status & Settings Summary -->
+          <div class="db-col-left">
+            <div class="glass-card cv-status-card">
+              <div class="card-header">
+                <h3><i class="fa-solid fa-file-invoice-dollar"></i> Current Active CV</h3>
+              </div>
+              <div class="cv-status-body" id="cvStatusContent">
+                <!-- Will be dynamically generated -->
+                <div class="cv-missing-state">
+                  <i class="fa-solid fa-file-circle-question"></i>
+                  <p>No CV uploaded yet. Please upload your CV to enable AI compatibility analysis.</p>
+                  <button class="btn btn-secondary btn-sm" onclick="triggerCVUpload()">Upload CV Now</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card active-settings-card">
+              <div class="card-header">
+                <h3><i class="fa-solid fa-gears"></i> Agent Configuration</h3>
+              </div>
+              <div class="settings-summary">
+                <div class="summary-item">
+                  <span class="label">Keywords:</span>
+                  <span class="value" id="sumKeywords">-</span>
+                </div>
+                <div class="summary-item">
+                  <span class="label">Locations:</span>
+                  <span class="value" id="sumLocations">-</span>
+                </div>
+                <div class="summary-item">
+                  <span class="label">Cron Timing:</span>
+                  <span class="value" id="sumCron">-</span>
+                </div>
+                <div class="summary-item">
+                  <span class="label">Job Sites:</span>
+                  <div class="source-badges">
+                    <span class="badge badge-source">Welcome to the Jungle</span>
+                    <span class="badge badge-source">APEC</span>
+                    <span class="badge badge-source">Indeed</span>
+                    <span class="badge badge-source">JobTeaser</span>
+                    <span class="badge badge-source">Cadremploi</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Terminal logs -->
+          <div class="db-col-right">
+            <div class="glass-card terminal-card">
+              <div class="card-header flex-header">
+                <h3><i class="fa-solid fa-terminal"></i> Agent Activity Logs</h3>
+                <button class="btn btn-text btn-sm" id="clearLogsBtn">
+                  <i class="fa-solid fa-trash-can"></i> Clear logs
+                </button>
+              </div>
+              <div class="terminal-body" id="terminalLogs">
+                <div class="log-line system-line">[System] Initializing console logs...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab Content: CV Manager -->
+      <section id="cv-managerTab" class="tab-content">
+        <div class="cv-manager-container">
+          <!-- Left: Upload Zone -->
+          <div class="cv-upload-pane">
+            <div class="glass-card upload-card" id="dropZone">
+              <input type="file" id="cvFileInput" accept=".pdf,.docx" style="display: none;">
+              <div class="upload-icon">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+              </div>
+              <h3>Drag & Drop your CV here</h3>
+              <p>Supports PDF and Word (.docx) formats up to 5MB</p>
+              <button class="btn btn-secondary" id="browseFileBtn">Browse File</button>
+            </div>
+
+            <!-- Upload Progress Overlay -->
+            <div class="glass-card upload-progress-card hidden" id="uploadProgressContainer">
+              <div class="spinner"></div>
+              <h3 id="progressStatus">Uploading CV...</h3>
+              <p id="progressSubText">Extracting text and analyzing with Gemini AI...</p>
+              <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Parsed Profile Preview -->
+          <div class="cv-preview-pane">
+            <div class="glass-card profile-preview-card">
+              <div class="card-header">
+                <h3><i class="fa-solid fa-address-card"></i> Parsed Profile Summary</h3>
+              </div>
+              <div class="profile-preview-body" id="profilePreviewContent">
+                <div class="empty-state">
+                  <i class="fa-solid fa-user-slash"></i>
+                  <p>Upload your CV to preview how the AI extracts your details, skills, and highlights.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab Content: Jobs List -->
+      <section id="jobsTab" class="tab-content">
+        <div class="jobs-view-container">
+          <!-- Left: Jobs List sidebar -->
+          <div class="jobs-sidebar">
+            <div class="glass-card search-filter-card">
+              <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="jobSearchInput" placeholder="Filter jobs by title, company...">
+              </div>
+              <div class="score-filters">
+                <span>Compatibility:</span>
+                <div class="filter-buttons">
+                  <button class="btn btn-chip active" data-score="all">All</button>
+                  <button class="btn btn-chip" data-score="high"><i class="fa-solid fa-circle text-emerald"></i> High (8+)</button>
+                  <button class="btn btn-chip" data-score="medium"><i class="fa-solid fa-circle text-warning"></i> Mid (5-7)</button>
+                  <button class="btn btn-chip" data-score="low"><i class="fa-solid fa-circle text-rose"></i> Low (<5)</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="jobs-list" id="jobsListContainer">
+              <!-- Dynamically populated -->
+              <div class="empty-state">
+                <i class="fa-solid fa-briefcase"></i>
+                <p>No jobs found. Run the agent search to fetch listings from job boards.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Job Match Details View -->
+          <div class="job-detail-pane" id="jobDetailPane">
+            <div class="glass-card job-empty-detail">
+              <i class="fa-solid fa-arrow-left"></i>
+              <h3>Select a job listing to view the detailed compatibility report</h3>
+              <p>Compare skills, generate personalized cover letters, and review CV improvements.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab Content: Settings -->
+      <section id="settingsTab" class="tab-content">
+        <div class="settings-form-container">
+          <div class="glass-card settings-card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-sliders"></i> Search & Scheduler Configuration</h3>
+            </div>
+            <form id="settingsForm" class="settings-form">
+              <div class="form-group">
+                <label for="keywordsInput">Job Search Keywords</label>
+                <input type="text" id="keywordsInput" required placeholder="e.g. Node.js Developer, React Engineer">
+                <span class="form-help">Enter target keywords separated by spaces or commas. Used by the crawler.</span>
+              </div>
+              
+              <div class="form-group">
+                <label for="locationsInput">Target Location</label>
+                <input type="text" id="locationsInput" required placeholder="e.g. Paris, Remote, Lyon">
+                <span class="form-help">Locations for job filters (e.g. city, country, or "Remote").</span>
+              </div>
+
+              <div class="form-group">
+                <label for="cronInput">Cron Schedule Pattern</label>
+                <input type="text" id="cronInput" required placeholder="e.g. 0 */6 * * *">
+                <span class="form-help">Standard 5-field cron pattern. <code>0 */6 * * *</code> runs 4 times per day (every 6 hours).</span>
+              </div>
+
+              <div class="form-group row-group">
+                <div class="form-checkbox-container">
+                  <label class="switch-label">
+                    <input type="checkbox" id="mockModeCheckbox">
+                    <span class="slider"></span>
+                  </label>
+                  <div class="checkbox-info">
+                    <label for="mockModeCheckbox">Enable Mock Crawler Fallbacks</label>
+                    <p>Highly recommended. Simulates job listings if target platforms block requests or enforce Cloudflare captchas.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="saveSettingsBtn">Save Configuration</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <!-- Premium Glassmorphic Job Details Modal -->
+  <dialog id="jobDetailsModal" class="glass-modal" closedby="any">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-company-logo" id="modalCompanyLogo"></div>
+        <div class="modal-title-area">
+          <h3 id="modalJobTitle">Job Title</h3>
+          <h4 id="modalJobCompany">Company Name</h4>
+          <div class="modal-badges">
+            <span id="modalJobSource" class="badge-platform">Source</span>
+            <span id="modalJobDate" class="form-help">Date</span>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="document.getElementById('jobDetailsModal').close()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-score-banner" id="modalScoreBanner">
+          <div class="modal-score-circle" id="modalScoreCircle">8/10</div>
+          <div class="modal-score-text">
+            <h5>Compatibility Score</h5>
+            <p id="modalScoreFeedback">Great fit based on your Product Management & CRM profile.</p>
+          </div>
+        </div>
+        
+        <div class="modal-grid">
+          <div class="modal-desc-col">
+            <div class="modal-section">
+              <h5><i class="fa-solid fa-align-left"></i> Job Description</h5>
+              <div id="modalJobDescription" class="modal-desc-content">Description</div>
+            </div>
+            
+            <div class="modal-section improvements-section" id="modalImprovementsBox">
+              <h5><i class="fa-solid fa-wand-magic-sparkles"></i> Tailored CV Suggestions</h5>
+              <ul id="modalImprovementsList" class="improvements-list"></ul>
+            </div>
+          </div>
+          
+          <div class="modal-skills-col">
+            <div class="modal-section">
+              <h5 class="text-emerald"><i class="fa-solid fa-circle-check"></i> Matching Skills</h5>
+              <div id="modalMatchingSkills" class="tag-container"></div>
+            </div>
+            
+            <div class="modal-section">
+              <h5 class="text-rose"><i class="fa-solid fa-circle-xmark"></i> Missing Skills</h5>
+              <div id="modalMissingSkills" class="tag-container"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section letter-section">
+          <div class="letter-actions">
+            <h5><i class="fa-solid fa-envelope-open-text"></i> Personalized Cover Letter Draft</h5>
+            <button class="btn btn-secondary btn-sm" onclick="copyModalCoverLetter(this)">
+              <i class="fa-solid fa-copy"></i> Copy Cover Letter
+            </button>
+          </div>
+          <div id="modalCoverLetter" class="letter-content-area">Letter content...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a id="modalViewOriginal" href="#" target="_blank" class="btn btn-primary">
+          <i class="fa-solid fa-external-link"></i> Apply on Original Site
+        </a>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
