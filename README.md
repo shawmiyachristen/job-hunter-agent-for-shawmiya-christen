@@ -199,3 +199,19 @@ To automate deployments or code quality checks:
              vercel-args: '--prod'
    ```
 2. Define the secrets (`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`) inside your GitHub repository settings under "Secrets and Variables > Actions".
+
+---
+
+## Local Mode vs Vercel Demo Mode
+
+To ensure the project functions flawlessly both in local production and serverless cloud deployment, the application executes in two modes:
+
+### 1. Local Mode
+- **CV Source**: The server reads and parses the local PDF CV (`CV VF Shawmiya CHRISTEN VASEEKARAN.pdf`) on boot. Manual resume uploads are persistently saved to the local file-based database (`data/db.json`).
+- **Scraper Persistence**: All matched listings, cover letters, and log history are saved to disk, preserving dashboard state across server restarts.
+- **Timing**: Integrates a persistent local cron scheduling process running 4 times per day (`0 */6 * * *`).
+
+### 2. Vercel Demo Mode (Serverless)
+- **Zero Local Files Dependency**: Ephemeral serverless containers do not persist local file writes across execution spin-downs. To prevent blank dashboards, the database defaults to a pre-seeded state containing the candidate's exact **ESCE + Digital Virgo** Product Management resume and **10 pre-matched CRM & Product Owner listings**.
+- **Crawler Fallbacks**: If Cloudflare anti-bot blocks or rate-limits prevent live crawls of Indeed or Welcome to the Jungle, the system automatically uses mock scrapers to generate realistic business/product openings rather than throwing empty page errors, showing a connection status notice banner on the Job Board.
+- **Timing**: Programmed to run once daily via Vercel Cron webhooks (`0 6 * * *`) to stay within Vercel free Hobby tier quotas.

@@ -1716,3 +1716,23 @@ input:checked + .slider:before {
   padding-top: 16px;
 }
 
+/* Connection Info Banner */
+.info-notice-banner {
+  background: rgba(8, 145, 178, 0.1);
+  border: 1px solid rgba(8, 145, 178, 0.25);
+  color: var(--accent-cyan);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.info-notice-banner i {
+  font-size: 14px;
+}
+
