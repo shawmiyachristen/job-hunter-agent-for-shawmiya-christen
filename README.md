@@ -111,9 +111,11 @@ npm test
 ## Scheduled Job Hunting Timing
 
 - **Local / VPS Environment**:
-  The application starts a background scheduler using `node-cron` immediately on boot. By default, it runs **4 times per day** (every 6 hours) at the pattern `0 */6 * * *`. You can customize this cron schedule inside the dashboard's "Settings" tab.
-- **Serverless / Vercel Environment**:
-  Background cron nodes cannot run persistently in serverless containers. Instead, the backend exposes a secure GET route at `/api/cron` which triggers a search run. Vercel Cron makes HTTP requests to this route four times per day.
+  The application starts a background scheduler using `node-cron` immediately on boot. By default, it runs **4 times per day** (every 6 hours) at the pattern `0 */6 * * *` to fetch new listings throughout the day. You can customize this local schedule inside the dashboard's "Settings" tab.
+- **Serverless / Vercel Environment (Hobby vs Pro)**:
+  Background cron processes cannot run persistently inside serverless container architectures. Instead, the backend exposes a secure GET endpoint at `/api/cron`.
+  - **Vercel Hobby Plan (Demo)**: Configured for **1 run per day** (`0 6 * * *`) due to the Vercel Hobby free tier limits (which enforce a maximum of daily cron executions).
+  - **Vercel Pro Plan**: You can upgrade the schedule to **4 runs per day** (`0 6,12,18,0 * * *`) to match the local schedule.
 
 ---
 
@@ -124,7 +126,7 @@ npm test
 This project is configured out-of-the-box for serverless deployment on [Vercel](https://vercel.com).
 
 1. **Vercel Config (`vercel.json`)**:
-   Enforces routing rules sending all requests to `server.js` (managed by `@vercel/node`) and sets up Vercel Cron jobs:
+   Enforces routing rules sending all requests to `server.js` (managed by `@vercel/node`) and configures Vercel Cron (once per day for Hobby tier):
    ```json
    {
      "version": 2,
@@ -137,7 +139,7 @@ This project is configured out-of-the-box for serverless deployment on [Vercel](
      "crons": [
        {
          "path": "/api/cron?secret=YOUR_CRON_SECRET",
-         "schedule": "0 6,12,18,0 * * *"
+         "schedule": "0 6 * * *"
        }
      ]
    }
